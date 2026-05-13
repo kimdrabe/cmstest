@@ -1,0 +1,21 @@
+media: assets/images
+content:
+  - name: landingpage
+    label: Landingpage
+    type: file
+    path: content/landingpage.md
+    fields:
+      - { name: hero_headline, label: Hero-Ueberschrift, type: string }
+      - { name: hero_text, label: Hero-Text, type: text }
+      - { name: leistungen_headline, label: Leistungen-Ueberschrift, type: string }
+      - name: leistungen
+        label: Leistungen
+        type: list
+        fields:
+          - { name: icon, label: Icon, type: string }
+          - { name: titel, label: Titel, type: string }
+          - { name: text, label: Text, type: text }
+      - { name: ueber_text, label: Ueber uns Text, type: text }
+      - { name: kontakt_adresse, label: Kontakt-Adresse, type: string }
+      - { name: kontakt_tel, label: Telefon, type: string }
+      - { name: kontakt_email, label: E-Mail, type: string }
