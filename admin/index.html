@@ -5,17 +5,342 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CMS - GrünBlatt Gärtnerei</title>
   <style>
-    body { font-family: -apple-system, sans-serif; margin: 0; }
-    .local-hint {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: #fff3cd; color: #856404; padding: 0.5rem 1rem;
-      font-size: 0.85rem; text-align: center; z-index: 9999;
-      border-top: 2px solid #ffc107;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+    #pat-form {
+      max-width: 420px; margin: 120px auto; padding: 2rem;
+      background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     }
+    #pat-form h2 { margin-bottom: 0.5rem; color: #2e7d32; }
+    #pat-form p { margin-bottom: 1.5rem; color: #666; font-size: 0.9rem; }
+    #pat-form input {
+      width: 100%; padding: 0.8rem; margin-bottom: 1rem;
+      border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;
+    }
+    #pat-form input:focus { outline: none; border-color: #2e7d32; }
+    #pat-form button {
+      width: 100%; padding: 0.8rem; background: #2e7d32; color: #fff;
+      border: none; border-radius: 8px; font-size: 1rem; cursor: pointer;
+    }
+    #pat-form button:hover { background: #1b5e20; }
+    #pat-form .hint { margin-top: 1rem; font-size: 0.8rem; color: #999; }
+    #pat-form .hint a { color: #2e7d32; }
+    #pat-form .error { color: #d32f2f; margin-bottom: 1rem; display: none; }
   </style>
 </head>
 <body>
-  <div class="local-hint">Lokal nutzen: Terminal -> <code>npx decap-server</code> starten, dann Seite neu laden.</div>
-  <script src="https://unpkg.com/decap-cms@^3/dist/decap-cms.js"></script>
+  <div id="pat-form" style="display:none">
+    <h2>🔑 CMS Login</h2>
+    <p>GitHub Personal Access Token eingeben</p>
+    <div class="error" id="pat-error">Token ungültig – bitte prüfen (Scope: repo, user)</div>
+    <input type="password" id="pat-input" placeholder="ghp_..." autocomplete="off">
+    <button onclick="handlePAT()">Login</button>
+    <div class="hint">
+      Token erstellen auf <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a><br>
+      Benötigte Scopes: <code>repo</code>, <code>user</code>
+    </div>
+  </div>
+
+  <div id="cms-loading" style="display:none;text-align:center;padding:80px;color:#666;">
+    Lade CMS...
+  </div>
+
+  <script>
+  // ─── Custom PAT Backend für Decap CMS ───────────────────────────
+
+  const STORAGE_KEY = 'cmstest_gh_pat'
+
+  function showForm() {
+    document.getElementById('pat-form').style.display = 'block'
+  }
+
+  function showCMS() {
+    document.getElementById('cms-loading').style.display = 'block'
+    loadDecapCMS()
+  }
+
+  async function handlePAT() {
+    const input = document.getElementById('pat-input')
+    const error = document.getElementById('pat-error')
+    const token = input.value.trim()
+    if (!token) return
+    const ok = await verifyToken(token)
+    if (ok) {
+      localStorage.setItem(STORAGE_KEY, token)
+      document.getElementById('pat-form').style.display = 'none'
+      showCMS()
+    } else {
+      error.style.display = 'block'
+    }
+  }
+
+  async function verifyToken(token) {
+    try {
+      const res = await fetch('https://api.github.com/user', {
+        headers: { Authorization: `token ${token}` }
+      })
+      return res.ok
+    } catch { return false }
+  }
+
+  function getPAT() {
+    return localStorage.getItem(STORAGE_KEY)
+  }
+
+  // ─── Custom Backend Klasse ──────────────────────────────────────
+
+  class PATGitHubBackend {
+    constructor(config) {
+      this.config = config
+      this.repo = config.repo
+      this.branch = config.branch || 'main'
+      this.token = getPAT()
+      this.apiRoot = 'https://api.github.com'
+      this._user = null
+    }
+
+    // ── Hilfsfunktionen ──
+
+    _headers() {
+      return {
+        Authorization: `token ${this.token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      }
+    }
+
+    async _gh(url, opts = {}) {
+      const res = await fetch(`${this.apiRoot}${url}`, { ...opts, headers: { ...this._headers(), ...opts.headers } })
+      const data = res.status === 204 ? null : await res.json()
+      if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`)
+      return data
+    }
+
+    _parseRepo() {
+      const parts = this.repo.split('/')
+      return { owner: parts[0], repo: parts[1] }
+    }
+
+    _contentPath(collection, slug) {
+      if (collection.folder) return `${collection.folder}/${slug}.md`
+      if (collection.files) {
+        const file = collection.files.find(f => f.name === slug)
+        return file ? file.file : slug
+      }
+      return slug
+    }
+
+    // ── Auth ──
+
+    async authenticate(state) {
+      const pat = state?.token || this.token
+      if (!pat) throw new Error('Kein Token')
+      this.token = pat
+      const user = await this._gh('/user')
+      this._user = user
+      return { token: pat, login: user.login }
+    }
+
+    async currentUser() {
+      if (this._user) return this._user
+      try {
+        const user = await this._gh('/user')
+        this._user = user
+        return user
+      } catch {
+        const pat = getPAT()
+        if (!pat) throw new Error('Nicht authentifiziert')
+        this.token = pat
+        const user = await this._gh('/user')
+        this._user = user
+        return user
+      }
+    }
+
+    async logout() {
+      localStorage.removeItem(STORAGE_KEY)
+      this.token = null
+      this._user = null
+    }
+
+    getToken() { return this.token }
+
+    // ── Einträge lesen ──
+
+    async getEntry(collection, slug) {
+      const { owner, repo } = this._parseRepo()
+      const path = this._contentPath(collection, slug)
+      try {
+        const data = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+        const content = atob(data.content)
+        return { file: { path, slug, sha: data.sha }, data: content }
+      } catch {
+        return null
+      }
+    }
+
+    async getEntries(collection) {
+      if (collection.files) {
+        const results = []
+        for (const file of collection.files) {
+          const entry = await this.getEntry(collection, file.name)
+          if (entry) results.push(entry)
+        }
+        return results
+      }
+      if (collection.folder) {
+        const { owner, repo } = this._parseRepo()
+        try {
+          const data = await this._gh(`/repos/${owner}/${repo}/contents/${collection.folder}?ref=${this.branch}`)
+          const entries = await Promise.all(data
+            .filter(item => item.name.endsWith('.md'))
+            .map(async item => {
+              const content = await this._gh(`/repos/${owner}/${repo}/contents/${item.path}?ref=${this.branch}`)
+              return {
+                file: { path: item.path, slug: item.name.replace('.md', ''), sha: content.sha },
+                data: atob(content.content)
+              }
+            }))
+          return entries
+        } catch { return [] }
+      }
+      return []
+    }
+
+    // ── Einträge schreiben ──
+
+    async persistEntry(entry, options) {
+      const { owner, repo } = this._parseRepo()
+      const collection = options.collection
+      const slug = entry.slug || entry.path
+      const path = this._contentPath(collection, slug)
+
+      let sha = null
+      try {
+        const existing = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+        sha = existing.sha
+      } catch {}
+
+      const body = {
+        message: `Update ${path}`,
+        content: btoa(entry.raw || entry.data || ''),
+        branch: this.branch,
+      }
+      if (sha) body.sha = sha
+
+      await this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      })
+    }
+
+    async deleteEntry(collection, slug) {
+      const { owner, repo } = this._parseRepo()
+      const path = this._contentPath(collection, slug)
+      const existing = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+      if (!existing) return
+      await this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          message: `Delete ${path}`,
+          sha: existing.sha,
+          branch: this.branch,
+        }),
+      })
+    }
+
+    // ── Media ──
+
+    async getMedia() {
+      const { owner, repo } = this._parseRepo()
+      const mediaFolder = this.config.media_folder || 'assets/images'
+      try {
+        const data = await this._gh(`/repos/${owner}/${repo}/contents/${mediaFolder}?ref=${this.branch}`)
+        return data.map(item => ({
+          name: item.name,
+          path: item.path,
+          url: item.download_url,
+          sha: item.sha,
+        }))
+      } catch { return [] }
+    }
+
+    async persistMedia(file, options) {
+      const { owner, repo } = this._parseRepo()
+      const mediaFolder = this.config.media_folder || 'assets/images'
+      const path = `${mediaFolder}/${file.name}`
+
+      let sha = null
+      try {
+        const existing = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+        sha = existing.sha
+      } catch {}
+
+      const body = {
+        message: `Upload ${file.name}`,
+        content: file.toBase64 ? file.toBase64() : file.content,
+        branch: this.branch,
+      }
+      if (sha) body.sha = sha
+
+      await this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      })
+    }
+
+    async deleteMedia(mediaFile) {
+      const { owner, repo } = this._parseRepo()
+      const path = mediaFile.path
+      const existing = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+      if (!existing) return
+      await this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          message: `Delete ${path}`,
+          sha: existing.sha || mediaFile.sha,
+          branch: this.branch,
+        }),
+      })
+    }
+
+    // ── Workflow (wird von Decap CMS benötigt) ──
+
+    asyncEntry() { return {} }
+    unpublishedEntries() { return [] }
+    unpublishedEntry() { return null }
+    unpublishedEntryDataFile() { return null }
+    unpublishedEntryMediaFile() { return null }
+    deleteUnpublishedEntry() {}
+    publishUnpublishedEntry() {}
+    updateUnpublishedEntryStatus() {}
+    deployPreview() { return null }
+    allEntriesByMaximum() { return [] }
+  }
+
+  // ─── Decap CMS initialisieren ──────────────────────────────────
+
+  function loadDecapCMS() {
+    const script = document.createElement('script')
+    script.src = 'https://unpkg.com/decap-cms@^3/dist/decap-cms.js'
+    script.onload = () => {
+      CMS.registerBackend('pat-github', PATGitHubBackend)
+      CMS.init()
+    }
+    document.body.appendChild(script)
+  }
+
+  // ─── Start ─────────────────────────────────────────────────────
+
+  ;(async function init() {
+    const pat = getPAT()
+    if (pat) {
+      const ok = await verifyToken(pat)
+      if (ok) { showCMS(); return }
+      localStorage.removeItem(STORAGE_KEY)
+    }
+    showForm()
+  })()
+  </script>
 </body>
 </html>
