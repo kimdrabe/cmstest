@@ -102,14 +102,25 @@
       })
 
       const listEl = document.querySelector('[data-cms-list]')
-      if (listEl && data.leistungen) {
-        listEl.innerHTML = data.leistungen.map(item => `
-          <div class="card">
-            <span class="card-icon">${item.icon || ''}</span>
-            <h3>${item.titel || ''}</h3>
-            <p>${item.text || ''}</p>
-          </div>
-        `).join('')
+      if (listEl) {
+        const items = []
+        for (let i = 1; i <= 4; i++) {
+          const icon = data[`leistung_${i}_icon`]
+          const titel = data[`leistung_${i}_titel`]
+          const text = data[`leistung_${i}_text`]
+          if (titel || icon) {
+            items.push({ icon, titel, text })
+          }
+        }
+        if (items.length) {
+          listEl.innerHTML = items.map(item => `
+            <div class="card">
+              <span class="card-icon">${item.icon || ''}</span>
+              <h3>${item.titel || ''}</h3>
+              <p>${item.text || ''}</p>
+            </div>
+          `).join('')
+        }
       }
 
       const h2 = document.querySelector('#ueber-uns h2')
