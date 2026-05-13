@@ -23,7 +23,8 @@ kontakt_tel: 030 12345678
 kontakt_email: info@gruenblatt.de
 galerie_1_bild: /assets/images/pcan.jpeg
 galerie_1_titel: Laptop
-galerie_2_titel: Naturnaher Garten
+galerie_2_bild: /assets/images/daten.jpeg
+galerie_2_titel: Daten
 galerie_3_titel: Steingarten
 galerie_4_titel: Teichanlage
 ---
