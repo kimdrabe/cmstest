@@ -24,3 +24,16 @@ content:
       - { name: kontakt_adresse, label: Kontakt-Adresse, type: string }
       - { name: kontakt_tel, label: Telefon, type: string }
       - { name: kontakt_email, label: E-Mail, type: string }
+  - name: impressum
+    label: Impressum
+    type: file
+    path: content/impressum.md
+    fields:
+      - { name: firma, label: Firmenname, type: string }
+      - { name: adresse, label: Adresse, type: string }
+      - { name: vertreter, label: Vertreter, type: string }
+      - { name: telefon, label: Telefon, type: string }
+      - { name: email, label: E-Mail, type: string }
+      - { name: register, label: Registereintrag, type: string }
+      - { name: ust_id, label: Umsatzsteuer-ID, type: string }
+      - { name: haftung, label: Haftungsausschluss, type: text }
