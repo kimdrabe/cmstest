@@ -1,6 +1,7 @@
 backend:
-  name: proxy
-  proxy_url: http://localhost:8081/api/v1
+  name: pat-github
+  repo: kimdrabe/cmstest
+  branch: main
 
 media_folder: assets/images
 public_folder: /assets/images
