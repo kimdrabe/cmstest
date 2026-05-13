@@ -1,0 +1,31 @@
+local_backend: true
+
+backend:
+  name: git-gateway
+  branch: main
+
+media_folder: assets/images
+public_folder: /assets/images
+
+collections:
+  - name: pages
+    label: Seiten
+    files:
+      - label: Landingpage
+        name: landingpage
+        file: content/landingpage.md
+        fields:
+          - { label: Hero-Überschrift, name: hero_headline, widget: string, default: "Ihre grüne Oase beginnt hier" }
+          - { label: Hero-Text, name: hero_text, widget: text, default: "Professionelle Gartenplanung, -pflege und -gestaltung aus Leidenschaft." }
+          - { label: Leistungen-Überschrift, name: leistungen_headline, widget: string, default: "Unsere Leistungen" }
+          - label: Leistungen
+            name: leistungen
+            widget: list
+            fields:
+              - { label: Icon (Emoji), name: icon, widget: string }
+              - { label: Titel, name: titel, widget: string }
+              - { label: Text, name: text, widget: text }
+          - { label: Über uns Text, name: ueber_text, widget: text, default: "Die GrünBlatt Gärtnerei ist ein Familienbetrieb mit über 20 Jahren Erfahrung." }
+          - { label: Kontakt-Adresse, name: kontakt_adresse, widget: string, default: "Musterstraße 42, 12345 Berlin" }
+          - { label: Telefon, name: kontakt_tel, widget: string, default: "030 12345678" }
+          - { label: E-Mail, name: kontakt_email, widget: string, default: "info@gruenblatt.de" }
