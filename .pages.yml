@@ -10,7 +10,10 @@ content:
       - { name: leistungen_headline, label: Leistungen-Ueberschrift, type: string }
       - name: leistungen
         label: Leistungen
-        type: list
+        type: object
+        list:
+          collapsible: true
+          summary: "{titel}"
         fields:
           - { name: icon, label: Icon, type: string }
           - { name: titel, label: Titel, type: string }
