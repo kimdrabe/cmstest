@@ -24,6 +24,14 @@ content:
       - { name: kontakt_adresse, label: Kontakt-Adresse, type: string }
       - { name: kontakt_tel, label: Telefon, type: string }
       - { name: kontakt_email, label: E-Mail, type: string }
+      - { name: galerie_1_bild, label: '1. Galerie-Bild', type: image }
+      - { name: galerie_1_titel, label: '1. Titel', type: string, default: "Modernes Gartendesign" }
+      - { name: galerie_2_bild, label: '2. Galerie-Bild', type: image }
+      - { name: galerie_2_titel, label: '2. Titel', type: string, default: "Naturnaher Garten" }
+      - { name: galerie_3_bild, label: '3. Galerie-Bild', type: image }
+      - { name: galerie_3_titel, label: '3. Titel', type: string, default: "Steingarten" }
+      - { name: galerie_4_bild, label: '4. Galerie-Bild', type: image }
+      - { name: galerie_4_titel, label: '4. Titel', type: string, default: "Teichanlage" }
   - name: impressum
     label: Impressum
     type: file
