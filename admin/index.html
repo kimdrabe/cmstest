@@ -46,9 +46,14 @@
   </div>
 
   <script>
-  // ─── Custom PAT Backend für Decap CMS ───────────────────────────
-
   const STORAGE_KEY = 'cmstest_gh_pat'
+
+  function b64enc(str) {
+    return btoa(unescape(encodeURIComponent(str)))
+  }
+  function b64dec(str) {
+    return decodeURIComponent(escape(atob(str)))
+  }
 
   function showForm() {
     document.getElementById('pat-form').style.display = 'block'
@@ -87,238 +92,203 @@
     return localStorage.getItem(STORAGE_KEY)
   }
 
-  // ─── Custom Backend Klasse ──────────────────────────────────────
-
   class PATGitHubBackend {
     constructor(config) {
       this.config = config
       this.repo = config.repo
       this.branch = config.branch || 'main'
       this.token = getPAT()
-      this.apiRoot = 'https://api.github.com'
       this._user = null
     }
 
-    // ── Hilfsfunktionen ──
-
-    _headers() {
-      return {
+    _gh(url, opts = {}) {
+      const headers = {
         Authorization: `token ${this.token}`,
         Accept: 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
       }
+      const merged = { ...opts, headers: { ...headers, ...opts.headers } }
+      return fetch(`https://api.github.com${url}`, merged).then(async res => {
+        const data = res.status === 204 ? null : await res.json()
+        if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`)
+        return data
+      })
     }
 
-    async _gh(url, opts = {}) {
-      const res = await fetch(`${this.apiRoot}${url}`, { ...opts, headers: { ...this._headers(), ...opts.headers } })
-      const data = res.status === 204 ? null : await res.json()
-      if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`)
-      return data
-    }
-
-    _parseRepo() {
-      const parts = this.repo.split('/')
-      return { owner: parts[0], repo: parts[1] }
-    }
-
-    _contentPath(collection, slug) {
-      if (collection.folder) return `${collection.folder}/${slug}.md`
-      if (collection.files) {
-        const file = collection.files.find(f => f.name === slug)
-        return file ? file.file : slug
-      }
-      return slug
+    _repo() {
+      const p = this.repo.split('/')
+      return { owner: p[0], repo: p[1] }
     }
 
     // ── Auth ──
 
-    async authenticate(state) {
+    authenticate(state) {
       const pat = state?.token || this.token
-      if (!pat) throw new Error('Kein Token')
+      if (!pat) { localStorage.removeItem(STORAGE_KEY); throw new Error('No token') }
       this.token = pat
-      const user = await this._gh('/user')
-      this._user = user
-      return { token: pat, login: user.login }
+      return this._gh('/user').then(user => {
+        this._user = user
+        return { token: pat, login: user.login }
+      })
     }
 
-    async currentUser() {
-      if (this._user) return this._user
-      try {
-        const user = await this._gh('/user')
+    currentUser() {
+      if (this._user) return Promise.resolve(this._user)
+      const pat = getPAT()
+      if (pat && !this.token) this.token = pat
+      if (!this.token) return Promise.reject(new Error('Not authenticated'))
+      return this._gh('/user').then(user => {
         this._user = user
         return user
-      } catch {
-        const pat = getPAT()
-        if (!pat) throw new Error('Nicht authentifiziert')
-        this.token = pat
-        const user = await this._gh('/user')
-        this._user = user
-        return user
-      }
+      })
     }
 
-    async logout() {
+    logout() {
       localStorage.removeItem(STORAGE_KEY)
       this.token = null
       this._user = null
+      return Promise.resolve()
     }
 
-    getToken() { return this.token }
+    getToken() { return Promise.resolve(this.token) }
 
-    // ── Einträge lesen ──
+    // ── Entries ──
 
-    async getEntry(collection, slug) {
-      const { owner, repo } = this._parseRepo()
-      const path = this._contentPath(collection, slug)
-      try {
-        const data = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
-        const content = atob(data.content)
-        return { file: { path, slug, sha: data.sha }, data: content }
-      } catch {
-        return null
-      }
-    }
-
-    async getEntries(collection) {
+    getEntry(collection, slug) {
+      const { owner, repo } = this._repo()
+      let path = slug
       if (collection.files) {
-        const results = []
-        for (const file of collection.files) {
-          const entry = await this.getEntry(collection, file.name)
-          if (entry) results.push(entry)
-        }
-        return results
+        const f = collection.files.find(f => f.name === slug)
+        if (f) path = f.file
+      } else if (collection.folder) {
+        path = `${collection.folder}/${slug}.md`
+      }
+      return this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+        .then(data => data ? { file: { path, slug, sha: data.sha, id: data.sha }, data: b64dec(data.content) } : null)
+        .catch(() => null)
+    }
+
+    getEntries(collection) {
+      if (collection.files) {
+        return Promise.all(collection.files.map(f => this.getEntry(collection, f.name)))
+          .then(results => results.filter(Boolean))
       }
       if (collection.folder) {
-        const { owner, repo } = this._parseRepo()
-        try {
-          const data = await this._gh(`/repos/${owner}/${repo}/contents/${collection.folder}?ref=${this.branch}`)
-          const entries = await Promise.all(data
-            .filter(item => item.name.endsWith('.md'))
-            .map(async item => {
-              const content = await this._gh(`/repos/${owner}/${repo}/contents/${item.path}?ref=${this.branch}`)
-              return {
-                file: { path: item.path, slug: item.name.replace('.md', ''), sha: content.sha },
-                data: atob(content.content)
-              }
-            }))
-          return entries
-        } catch { return [] }
+        const { owner, repo } = this._repo()
+        return this._gh(`/repos/${owner}/${repo}/contents/${collection.folder}?ref=${this.branch}`)
+          .then(data => Promise.all(data.filter(i => i.name.endsWith('.md')).map(item =>
+            this._gh(`/repos/${owner}/${repo}/contents/${item.path}?ref=${this.branch}`)
+              .then(c => ({
+                file: { path: item.path, slug: item.name.replace('.md', ''), sha: c.sha, id: c.sha },
+                data: b64dec(c.content)
+              }))
+          )))
+          .catch(() => [])
       }
-      return []
+      return Promise.resolve([])
     }
 
-    // ── Einträge schreiben ──
-
-    async persistEntry(entry, options) {
-      const { owner, repo } = this._parseRepo()
-      const collection = options.collection
-      const slug = entry.slug || entry.path
-      const path = this._contentPath(collection, slug)
-
-      let sha = null
-      try {
-        const existing = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
-        sha = existing.sha
-      } catch {}
-
-      const body = {
-        message: `Update ${path}`,
-        content: btoa(entry.raw || entry.data || ''),
-        branch: this.branch,
-      }
-      if (sha) body.sha = sha
-
-      await this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      })
+    persistEntry(entry, options) {
+      const { owner, repo } = this._repo()
+      const files = entry.dataFiles || [entry]
+      return Promise.all(files.map(file => {
+        const path = file.path || this.config.collections?.find(c => c.name === options?.collection)?.files?.find(f => f.name === file.slug)?.file
+        return this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+          .then(existing => ({ sha: existing?.sha }))
+          .catch(() => ({}))
+          .then(({ sha }) =>
+            this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                message: `Update ${path}`,
+                content: b64enc(file.raw || ''),
+                branch: this.branch,
+                sha,
+              }),
+            })
+          )
+      })).then(() => {})
     }
 
-    async deleteEntry(collection, slug) {
-      const { owner, repo } = this._parseRepo()
-      const path = this._contentPath(collection, slug)
-      const existing = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
-      if (!existing) return
-      await this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
-        method: 'DELETE',
-        body: JSON.stringify({
-          message: `Delete ${path}`,
-          sha: existing.sha,
-          branch: this.branch,
-        }),
-      })
+    deleteEntry(collection, slug) {
+      const { owner, repo } = this._repo()
+      let path = slug
+      if (collection.files) {
+        const f = collection.files.find(f => f.name === slug)
+        if (f) path = f.file
+      }
+      return this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+        .then(existing => {
+          if (!existing) return
+          return this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
+            method: 'DELETE',
+            body: JSON.stringify({ message: `Delete ${path}`, sha: existing.sha, branch: this.branch }),
+          })
+        }).catch(() => {})
     }
 
     // ── Media ──
 
-    async getMedia() {
-      const { owner, repo } = this._parseRepo()
-      const mediaFolder = this.config.media_folder || 'assets/images'
-      try {
-        const data = await this._gh(`/repos/${owner}/${repo}/contents/${mediaFolder}?ref=${this.branch}`)
-        return data.map(item => ({
-          name: item.name,
-          path: item.path,
-          url: item.download_url,
-          sha: item.sha,
+    getMedia() {
+      const { owner, repo } = this._repo()
+      const folder = this.config.media_folder || 'assets/images'
+      return this._gh(`/repos/${owner}/${repo}/contents/${folder}?ref=${this.branch}`)
+        .then(data => data.map(item => ({
+          id: item.sha, name: item.name, path: item.path,
+          url: `https://raw.githubusercontent.com/${owner}/${repo}/${this.branch}/${item.path}`,
+          thumbnail: item.download_url, sha: item.sha,
+        }))).catch(() => [])
+    }
+
+    persistMedia(file, options) {
+      const { owner, repo } = this._repo()
+      const folder = options.mediaFolder || this.config.media_folder || 'assets/images'
+      const path = `${folder}/${file.name}`
+      return this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+        .then(existing => ({ sha: existing?.sha }))
+        .catch(() => ({}))
+        .then(({ sha }) =>
+          this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              message: `Upload ${file.name}`,
+              content: file.toBase64 ? file.toBase64() : file.content,
+              branch: this.branch,
+              sha,
+            }),
+          })
+        ).then(() => ({
+          id: path, name: file.name, path,
+          url: `https://raw.githubusercontent.com/${owner}/${repo}/${this.branch}/${path}`,
+          size: file.size,
         }))
-      } catch { return [] }
     }
 
-    async persistMedia(file, options) {
-      const { owner, repo } = this._parseRepo()
-      const mediaFolder = this.config.media_folder || 'assets/images'
-      const path = `${mediaFolder}/${file.name}`
-
-      let sha = null
-      try {
-        const existing = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
-        sha = existing.sha
-      } catch {}
-
-      const body = {
-        message: `Upload ${file.name}`,
-        content: file.toBase64 ? file.toBase64() : file.content,
-        branch: this.branch,
-      }
-      if (sha) body.sha = sha
-
-      await this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      })
-    }
-
-    async deleteMedia(mediaFile) {
-      const { owner, repo } = this._parseRepo()
+    deleteMedia(mediaFile) {
+      const { owner, repo } = this._repo()
       const path = mediaFile.path
-      const existing = await this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
-      if (!existing) return
-      await this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
-        method: 'DELETE',
-        body: JSON.stringify({
-          message: `Delete ${path}`,
-          sha: existing.sha || mediaFile.sha,
-          branch: this.branch,
-        }),
-      })
+      return this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
+        .then(existing => {
+          if (!existing) return
+          return this._gh(`/repos/${owner}/${repo}/contents/${path}`, {
+            method: 'DELETE',
+            body: JSON.stringify({ message: `Delete ${path}`, sha: existing.sha, branch: this.branch }),
+          })
+        }).catch(() => {})
     }
 
-    // ── Workflow (wird von Decap CMS benötigt) ──
+    // ── Stubs (editorial workflow etc.) ──
 
     asyncEntry() { return {} }
-    unpublishedEntries() { return [] }
-    unpublishedEntry() { return null }
-    unpublishedEntryDataFile() { return null }
-    unpublishedEntryMediaFile() { return null }
-    deleteUnpublishedEntry() {}
-    publishUnpublishedEntry() {}
-    updateUnpublishedEntryStatus() {}
-    deployPreview() { return null }
-    allEntriesByMaximum() { return [] }
+    unpublishedEntries() { return Promise.resolve([]) }
+    unpublishedEntry() { return Promise.resolve() }
+    unpublishedEntryDataFile() { return Promise.resolve() }
+    unpublishedEntryMediaFile() { return Promise.resolve() }
+    deleteUnpublishedEntry() { return Promise.resolve() }
+    publishUnpublishedEntry() { return Promise.resolve() }
+    updateUnpublishedEntryStatus() { return Promise.resolve() }
+    deployPreview() { return Promise.resolve(null) }
+    allEntriesByCollection() { return Promise.resolve({}) }
   }
-
-  // ─── Decap CMS initialisieren ──────────────────────────────────
 
   function loadDecapCMS() {
     const script = document.createElement('script')
@@ -329,8 +299,6 @@
     }
     document.body.appendChild(script)
   }
-
-  // ─── Start ─────────────────────────────────────────────────────
 
   ;(async function init() {
     const pat = getPAT()
