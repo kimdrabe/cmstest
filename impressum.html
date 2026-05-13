@@ -6,7 +6,7 @@
   <title>Impressum - GrünBlatt Gärtnerei</title>
   <link rel="stylesheet" href="assets/css/style.css">
   <style>
-    .impressum {
+    .impressum-wrap {
       max-width: 700px;
       margin: 100px auto;
       padding: 2rem;
@@ -14,33 +14,27 @@
       border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.06);
     }
-    .impressum h1 {
+    .impressum-wrap h1 {
       color: #2e7d32;
       margin-bottom: 2rem;
       font-size: 1.8rem;
     }
-    .impressum h2 {
+    .impressum-wrap h2 {
       font-size: 1.1rem;
       color: #333;
       margin: 1.5rem 0 0.3rem;
     }
-    .impressum p {
+    .impressum-wrap p {
       color: #555;
       line-height: 1.7;
-    }
-    .impressum a {
-      color: #2e7d32;
     }
     .back-link {
       display: inline-block;
       margin-top: 2rem;
       color: #2e7d32;
-      text-decoration: none;
-      font-weight: 500;
+      text-decoration: none; font-weight: 500;
     }
-    .back-link:hover {
-      text-decoration: underline;
-    }
+    .back-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -56,44 +50,45 @@
     </nav>
   </header>
 
-  <main class="impressum">
+  <main class="impressum-wrap">
     <h1>Impressum</h1>
-
     <h2>Angaben gemäß § 5 TMG</h2>
-    <p>
-      GrünBlatt Gärtnerei GmbH<br>
-      Musterstraße 42<br>
-      12345 Berlin
-    </p>
-
+    <p data-cms="firma">GrünBlatt Gärtnerei GmbH</p>
+    <p data-cms="adresse">Musterstraße 42, 12345 Berlin</p>
     <h2>Vertreten durch</h2>
-    <p>Max Mustermann (Geschäftsführer)</p>
-
+    <p data-cms="vertreter">Max Mustermann (Geschäftsführer)</p>
     <h2>Kontakt</h2>
-    <p>
-      Telefon: 030 12345678<br>
-      E-Mail: info@gruenblatt.de
-    </p>
-
+    <p data-cms="telefon">Tel: 030 12345678</p>
+    <p data-cms="email">E-Mail: info@gruenblatt.de</p>
     <h2>Registereintrag</h2>
-    <p>
-      Amtsgericht Berlin-Charlottenburg<br>
-      HRB 123456
-    </p>
-
+    <p data-cms="register">Amtsgericht Berlin-Charlottenburg, HRB 123456</p>
     <h2>Umsatzsteuer-ID</h2>
-    <p>DE123456789</p>
-
+    <p data-cms="ust_id">DE123456789</p>
     <h2>Haftungsausschluss</h2>
-    <p>
-      Die Inhalte dieser Website wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte können wir jedoch keine Gewähr übernehmen.
-    </p>
-
+    <p data-cms="haftung">Die Inhalte dieser Website wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte können wir jedoch keine Gewähr übernehmen.</p>
     <a href="index.html" class="back-link">← Zurück zur Startseite</a>
   </main>
 
   <footer>
     <p>&copy; 2026 GrünBlatt Gärtnerei</p>
   </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4/dist/js-yaml.min.js"></script>
+  <script>
+  fetch('content/impressum.md')
+    .then(r => r.text())
+    .then(text => {
+      const m = text.match(/^---\n([\s\S]*?)\n---/)
+      if (!m) return
+      const data = jsyaml.load(m[1])
+      document.querySelectorAll('[data-cms]').forEach(el => {
+        const key = el.dataset.cms
+        if (data[key] !== undefined) {
+          el.textContent = data[key]
+        }
+      })
+    })
+    .catch(() => {})
+  </script>
 </body>
 </html>
