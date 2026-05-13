@@ -8,14 +8,18 @@ content:
       - { name: hero_headline, label: Hero-Ueberschrift, type: string }
       - { name: hero_text, label: Hero-Text, type: text }
       - { name: leistungen_headline, label: Leistungen-Ueberschrift, type: string }
-      - name: leistungen
-        label: Leistungen
-        type: object
-        list: true
-        fields:
-          - { name: icon, label: Icon, type: string }
-          - { name: titel, label: Titel, type: string }
-          - { name: text, label: Text, type: text }
+      - { name: leistung_1_icon, label: '1. Icon', type: string, default: "🌳" }
+      - { name: leistung_1_titel, label: '1. Titel', type: string, default: "Gartenplanung" }
+      - { name: leistung_1_text, label: '1. Text', type: text, default: "Von der Idee bis zur Umsetzung." }
+      - { name: leistung_2_icon, label: '2. Icon', type: string, default: "✂️" }
+      - { name: leistung_2_titel, label: '2. Titel', type: string, default: "Baumpflege" }
+      - { name: leistung_2_text, label: '2. Text', type: text, default: "Fachgerechter Schnitt und Pflege." }
+      - { name: leistung_3_icon, label: '3. Icon', type: string, default: "🌺" }
+      - { name: leistung_3_titel, label: '3. Titel', type: string, default: "Bepflanzung" }
+      - { name: leistung_3_text, label: '3. Text', type: text, default: "Individuelle Bepflanzung." }
+      - { name: leistung_4_icon, label: '4. Icon', type: string, default: "💧" }
+      - { name: leistung_4_titel, label: '4. Titel', type: string, default: "Bewässerung" }
+      - { name: leistung_4_text, label: '4. Text', type: text, default: "Automatische Bewässerungssysteme." }
       - { name: ueber_text, label: Ueber uns Text, type: text }
       - { name: kontakt_adresse, label: Kontakt-Adresse, type: string }
       - { name: kontakt_tel, label: Telefon, type: string }
