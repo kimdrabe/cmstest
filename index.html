@@ -133,7 +133,8 @@
       if (galGrid) {
         const galItems = []
         for (let i = 1; i <= 4; i++) {
-          const img = data[`galerie_${i}_bild`]
+          const raw = data[`galerie_${i}_bild`] || ''
+          const img = raw.replace(/^\//, '')
           const title = data[`galerie_${i}_titel`]
           if (img || title) galItems.push({ img, title })
         }
