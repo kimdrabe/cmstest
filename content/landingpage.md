@@ -21,7 +21,6 @@ ueber_text: Die GrünBlatt Gärtnerei ist ein Familienbetrieb mit über 20 Jahre
 kontakt_adresse: Musterstraße 42, 12345 Berlin
 kontakt_tel: 030 12345678
 kontakt_email: info@gruenblatt.de
-galerie_1_bild: /assets/images/pcan.jpeg
 galerie_1_titel: Laptop
 galerie_2_bild: /assets/images/daten.jpeg
 galerie_2_titel: Daten
