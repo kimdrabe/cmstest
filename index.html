@@ -21,15 +21,15 @@
 
   <section id="hero">
     <div class="hero-content">
-      <h1>Ihre grüne Oase beginnt hier</h1>
-      <p>Professionelle Gartenplanung, -pflege und -gestaltung aus Leidenschaft – seit über 20 Jahren.</p>
+      <h1 data-cms="hero_headline">Ihre grüne Oase beginnt hier</h1>
+      <p data-cms="hero_text">Professionelle Gartenplanung, -pflege und -gestaltung aus Leidenschaft – seit über 20 Jahren.</p>
       <a href="#kontakt" class="btn">Kostenloses Angebot</a>
     </div>
   </section>
 
   <section id="leistungen">
-    <h2>Unsere Leistungen</h2>
-    <div class="leistungen-grid">
+    <h2 data-cms="leistungen_headline">Unsere Leistungen</h2>
+    <div class="leistungen-grid" data-cms-list="leistungen">
       <div class="card">
         <span class="card-icon">🌳</span>
         <h3>Gartenplanung</h3>
@@ -55,7 +55,7 @@
 
   <section id="ueber-uns">
     <h2>Über uns</h2>
-    <p>Die GrünBlatt Gärtnerei ist ein Familienbetrieb mit über 20 Jahren Erfahrung. Wir lieben Pflanzen und gestalten mit Leidenschaft grüne Lebensräume – ob kleiner Stadtgarten oder großes Anwesen. Uner Team aus zertifizierten Gärtnern und Landschaftsarchitekten steht Ihnen mit Rat und Tat zur Seite.</p>
+    <p data-cms="ueber_text">Die GrünBlatt Gärtnerei ist ein Familienbetrieb mit über 20 Jahren Erfahrung. Wir lieben Pflanzen und gestalten mit Leidenschaft grüne Lebensräume – ob kleiner Stadtgarten oder großes Anwesen.</p>
   </section>
 
   <section id="galerie">
@@ -72,14 +72,58 @@
     <h2>Kontakt</h2>
     <div class="kontakt-info">
       <p><strong>GrünBlatt Gärtnerei</strong></p>
-      <p>🌍 Musterstraße 42, 12345 Berlin</p>
-      <p>📞 Tel: 030 12345678</p>
-      <p>✉️ E-Mail: info@gruenblatt.de</p>
+      <p data-cms="kontakt_adresse">🌍 Musterstraße 42, 12345 Berlin</p>
+      <p data-cms="kontakt_tel">📞 Tel: 030 12345678</p>
+      <p data-cms="kontakt_email">✉️ E-Mail: info@gruenblatt.de</p>
     </div>
   </section>
 
   <footer>
     <p>&copy; 2026 GrünBlatt Gärtnerei</p>
   </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4/dist/js-yaml.min.js"></script>
+  <script>
+  fetch('content/landingpage.md')
+    .then(r => r.text())
+    .then(text => {
+      const m = text.match(/^---\n([\s\S]*?)\n---/)
+      if (!m) return
+      const data = jsyaml.load(m[1])
+
+      document.querySelectorAll('[data-cms]').forEach(el => {
+        const key = el.dataset.cms
+        if (data[key] !== undefined && typeof data[key] === 'string') {
+          el.textContent = el.innerHTML.includes('🌍') ? `🌍 ${data[key]}` :
+                           el.innerHTML.includes('📞') ? `📞 Tel: ${data[key]}` :
+                           el.innerHTML.includes('✉️') ? `✉️ E-Mail: ${data[key]}` :
+                           data[key]
+        }
+      })
+
+      const listEl = document.querySelector('[data-cms-list]')
+      if (listEl && data.leistungen) {
+        listEl.innerHTML = data.leistungen.map(item => `
+          <div class="card">
+            <span class="card-icon">${item.icon || ''}</span>
+            <h3>${item.titel || ''}</h3>
+            <p>${item.text || ''}</p>
+          </div>
+        `).join('')
+      }
+
+      const h2 = document.querySelector('#ueber-uns h2')
+      const ueberP = document.querySelector('[data-cms="ueber_text"]')
+      if (ueberP && data.ueber_text) {
+        h2.textContent = 'Über uns'
+        ueberP.textContent = data.ueber_text
+      }
+
+      if (data.leistungen_headline) {
+        document.querySelector('#leistungen h2').textContent = data.leistungen_headline
+      }
+    })
+    .catch(() => {})
+  </script>
 </body>
 </html>
