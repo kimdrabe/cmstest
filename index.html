@@ -60,12 +60,7 @@
 
   <section id="galerie">
     <h2>Galerie</h2>
-    <div class="galerie-grid">
-      <div class="galerie-item" style="background: linear-gradient(135deg, #6b8e23, #8fbc8f);"><span>Modernes Gartendesign</span></div>
-      <div class="galerie-item" style="background: linear-gradient(135deg, #556b2f, #6b8e23);"><span>Naturnaher Garten</span></div>
-      <div class="galerie-item" style="background: linear-gradient(135deg, #2e8b57, #3cb371);"><span>Steingarten</span></div>
-      <div class="galerie-item" style="background: linear-gradient(135deg, #228b22, #32cd32);"><span>Teichanlage</span></div>
-    </div>
+    <div class="galerie-grid" id="galerie-grid"></div>
   </section>
 
   <section id="kontakt">
@@ -132,6 +127,23 @@
 
       if (data.leistungen_headline) {
         document.querySelector('#leistungen h2').textContent = data.leistungen_headline
+      }
+
+      const galGrid = document.getElementById('galerie-grid')
+      if (galGrid) {
+        const galItems = []
+        for (let i = 1; i <= 4; i++) {
+          const img = data[`galerie_${i}_bild`]
+          const title = data[`galerie_${i}_titel`]
+          if (img || title) galItems.push({ img, title })
+        }
+        if (galItems.length) {
+          galGrid.innerHTML = galItems.map(item => `
+            <div class="galerie-item"${item.img ? ` style="background-image:url('${item.img}');background-size:cover;background-position:center"` : ''}>
+              <span>${item.title || ''}</span>
+            </div>
+          `).join('')
+        }
       }
     })
     .catch(() => {})
