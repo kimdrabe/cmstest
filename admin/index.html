@@ -190,8 +190,14 @@
     persistEntry(entry, options) {
       const { owner, repo } = this._repo()
       const files = entry.dataFiles || [entry]
+      const col = options?.collection || {}
       return Promise.all(files.map(file => {
-        const path = file.path || this.config.collections?.find(c => c.name === options?.collection)?.files?.find(f => f.name === file.slug)?.file
+        let path = file.path
+        if (!path && col.files) {
+          const found = col.files.find(f => f.name === file.slug) || col.files.find(f => f.name === entry.slug)
+          if (found) path = found.file
+        }
+        if (!path && col.folder) path = `${col.folder}/${file.slug || entry.slug}.md`
         return this._gh(`/repos/${owner}/${repo}/contents/${path}?ref=${this.branch}`)
           .then(existing => ({ sha: existing?.sha }))
           .catch(() => ({}))
